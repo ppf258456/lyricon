@@ -14,9 +14,10 @@ export class EmailService {
     private configService: ConfigService,
   ) {
     this.transporter = mailConfig(this.configService);
-    this.checkRedisConnection();
   }
-
+  async onModuleInit() {
+    await this.checkRedisConnection();
+  }
   private async checkRedisConnection() {
     try {
       const pong = await this.redis.ping();

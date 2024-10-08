@@ -9,7 +9,7 @@ import { Article } from '../modules/article/entities/article.entity';
 import { Category } from '../modules/category/entities//category.entity';
 import { Music } from '../modules/music/entities/music.entity';
 import { Video } from '../modules/video/entities/video.entity';
-
+import { Comment } from '../modules/comments/entities/comment.entity';
 export default function typeormConfig(
   configService: ConfigService,
 ): TypeOrmModuleOptions {
@@ -20,7 +20,7 @@ export default function typeormConfig(
     username: configService.get<string>('DATABASE_USER'),
     password: configService.get<string>('DATABASE_PASS'),
     database: configService.get<string>('DATABASE_NAME'),
-    entities: [User, Article, Category, Music, Video],
-    synchronize: true, // 开发环境下使用，生产环境建议关闭
+    entities: [User, Article, Category, Music, Video, Comment],
+    synchronize: false, // 开发环境下使用，生产环境建议关闭
   };
 }

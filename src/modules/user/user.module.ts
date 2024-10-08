@@ -1,17 +1,22 @@
 // src/modules/user/user.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { User } from './entities/user.entity';
-import { RedisModule } from '../redis/redis.module';
-
+import { ScheduleModule } from '@nestjs/schedule';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { jwtConfig } from 'src/config/jwt.config';
 @Module({
   imports: [
-    JwtModule.register({}), // 注册 JwtModule
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => jwtConfig(configService),
+      inject: [ConfigService],
+    }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forFeature([User]),
-    RedisModule, // 导入 RedisModule
   ],
   controllers: [UserController],
   providers: [UserService],

@@ -4,19 +4,24 @@ import {
   ConflictException,
   Inject,
   UnauthorizedException,
+  ForbiddenException,
+  NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+
 import { InjectRepository } from '@nestjs/typeorm';
 import { User, UserRole } from './entities/user.entity';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { Redis } from 'ioredis';
 import { LoginDto } from '../login/dto/login.dto';
 import { JwtService } from '@nestjs/jwt'; // 导入 JwtService
+import { UpdateUserDto } from './dto/update-user.dto';
+import { Cron } from '@nestjs/schedule';
 @Injectable()
-export class UserService {
+export class UserService implements OnModuleInit {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -24,7 +29,10 @@ export class UserService {
     private readonly redis: Redis,
     private readonly jwtService: JwtService, // 注入 JwtService
   ) {}
-
+  onModuleInit() {
+    // 启动时可以执行一次检查
+    this.checkAndDeleteUsers();
+  }
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { email } });
   }
@@ -76,7 +84,9 @@ export class UserService {
     // 保存到数据库
     return this.userRepository.save(newUser);
   }
-  async login(loginDto: LoginDto): Promise<{ accessToken: string }> {
+  async login(
+    loginDto: LoginDto,
+  ): Promise<{ accessToken: string; message: string }> {
     const { emailOrUid, password } = loginDto;
 
     // 查找用户
@@ -96,29 +106,132 @@ export class UserService {
 
     // 生成访问令牌 (JWT)
     const accessToken = this.generateAccessToken(user);
-    return { accessToken };
+
+    // 将 token 存入 Redis
+    await this.redis.set(`token:${user.id}`, accessToken, 'EX', 3600); // 设置 1 小时过期
+
+    return {
+      accessToken,
+      message: '登录成功',
+    };
+  }
+
+  async findAll(userRole: UserRole) {
+    if (userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('仅管理员可以查看所有用户');
+    }
+    const users = await this.userRepository.find();
+    return users.map((user) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...userData } = user;
+      return userData; // 返回不包含密码的用户数据
+    });
+  }
+
+  async findOne(id: number, authHeader?: string) {
+    const userData = await this.userRepository.findOneBy({ id });
+    if (!userData) {
+      throw new NotFoundException('用户未找到');
+    } else if (userData.isActive === false) {
+      throw new NotFoundException('用户未找到');
+    }
+
+    if (!authHeader) {
+      // 未登录用户返回基本信息
+      return {
+        username: userData.username,
+        bio: userData.bio,
+        avatar: userData.avatar,
+      };
+    }
+
+    // 已登录用户返回详细信息
+    const token = authHeader.split(' ')[1];
+    const payload = await this.jwtService.verifyAsync(token);
+    if (payload) {
+      return {
+        username: userData.username,
+        bio: userData.bio,
+        avatar: userData.avatar,
+        uid: userData.uid,
+        backgroundImage: userData.backgroundImage,
+        coins: userData.coins,
+        level: userData.level,
+      }; // 返回完整用户信息
+    }
+  }
+
+  async update(id: number, updateUserDto: UpdateUserDto, userId: number) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (id !== userId) {
+      throw new ForbiddenException('仅用户本人可以更新信息');
+    }
+    if (user.isActive === false) {
+      throw new ForbiddenException('用户账户已被冻结，无法更新信息');
+    }
+    await this.userRepository.update(id, updateUserDto);
+    return { message: '更新成功' }; // 返回提示信息
+  }
+
+  async softDelete(id: number) {
+    const user = await this.userRepository.findOne({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('用户未找到');
+    }
+
+    await this.userRepository.softDelete(id);
+    return { message: '删除成功！' };
   }
 
   private generateAccessToken(user: User): string {
-    // 实现你的 JWT 生成逻辑
-    // 例如：return this.jwtService.sign({ id: user.id, email: user.email });
-    return this.jwtService.sign({ id: user.id, email: user.email });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userData } = user; // 去掉密码字段
+    return this.jwtService.sign({
+      id: userData.id,
+      uid: userData.uid,
+      username: userData.username,
+      email: userData.email,
+      role: userData.role,
+      level: userData.level,
+    }); // 使用更新后的用户数据
   }
 
-  findAll() {
-    return this.userRepository.find();
+  async getUserFromToken(authHeader: string): Promise<User> {
+    const token = authHeader.split(' ')[1]; // 提取 Bearer Token
+    const payload = await this.jwtService.verifyAsync(token); // 验证 token
+    return this.userRepository.findOne({ where: { id: payload.id } }); // 使用 findOne 以避免未找到用户时抛出错误
   }
 
-  findOne(id: number) {
-    return this.userRepository.findOneBy({ id });
+  async clearUserInfo(userId: number) {
+    await this.userRepository.update(userId, {
+      username: '已注销用户',
+      email: '已注销邮箱',
+      password: '111111', // 如果密码不能为null，考虑使用默认值
+      avatar: '默认头像URL',
+      backgroundImage: '默认背景图URL',
+      bio: '该用户已注销',
+      coins: 0,
+      lastLogin: null,
+      devices: null,
+    });
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto) {
-    await this.userRepository.update(id, updateUserDto);
-    return this.findOne(id);
-  }
+  @Cron('0 0 * * *') // 每天午夜执行
+  async checkAndDeleteUsers() {
+    const usersToDelete = await this.userRepository.find({
+      where: { deletedAt: Not(IsNull()) },
+    });
+    const currentDate = new Date();
 
-  async remove(id: number) {
-    await this.userRepository.delete(id);
+    for (const user of usersToDelete) {
+      const deletionDate = new Date(user.deletedAt);
+      const diffDays =
+        (currentDate.getTime() - deletionDate.getTime()) / (1000 * 3600 * 24);
+
+      if (diffDays >= 15) {
+        await this.clearUserInfo(user.id); // 清空用户信息
+      }
+    }
   }
 }

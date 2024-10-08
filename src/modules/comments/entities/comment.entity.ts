@@ -5,8 +5,8 @@ import {
   ManyToOne,
   DeleteDateColumn,
 } from 'typeorm';
-import { User } from '../user/entities/user.entity';
-import { Article } from '../article/entities/article.entity';
+import { User } from '../../user/entities/user.entity';
+import { Article } from '../../article/entities/article.entity';
 
 @Entity()
 export class Comment {
@@ -30,4 +30,7 @@ export class Comment {
 
   @DeleteDateColumn({ type: 'timestamp', nullable: true })
   deletedAt: Date; // 软删除时间
+
+  @Column({ type: 'int', default: 0 })
+  likeCount: number; // 点赞数
 }

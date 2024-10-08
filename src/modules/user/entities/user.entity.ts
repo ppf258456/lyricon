@@ -8,11 +8,10 @@ import {
   DeleteDateColumn,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-
 import { Article } from '../../article/entities/article.entity';
 import { Music } from '../../music/entities/music.entity';
 import { Video } from '../../video/entities/video.entity';
-
+import { Comment } from '../../comments/entities/comment.entity'; // 导入评论实体
 export enum UserRole {
   ADMIN = 'admin',
   EDITOR = 'editor',
@@ -35,16 +34,16 @@ export class User {
   id: number;
 
   @Column({ unique: true })
-  uid: string; // UID，用户可见的唯一标识符
+  uid: string; // 用户唯一标识符
 
-  @Column({ unique: true })
-  username: string; // 用户名，唯一
+  @Column({ nullable: false, unique: true })
+  username: string; // 用户名
 
   @Column()
   password: string; // 用户密码（应加密存储）
 
-  @Column({ unique: true, nullable: false })
-  email: string; // 用户电子邮件，非空且唯一
+  @Column({ nullable: false, unique: true })
+  email: string; // 用户电子邮件
 
   @Column({ default: true })
   isActive: boolean; // 用户是否激活
@@ -53,10 +52,10 @@ export class User {
   role: UserRole;
 
   @Column({ nullable: true, type: 'longtext' })
-  avatar: string; // 头像base64
+  avatar: string; // 头像
 
   @Column({ nullable: true, type: 'longtext' })
-  backgroundImage: string; // 背景图的 URL
+  backgroundImage: string; // 背景图 URL
 
   @Column({ nullable: true })
   bio: string; // 个人简介
@@ -65,10 +64,10 @@ export class User {
   coins: number; // 硬币数
 
   @Column({ type: 'timestamp', nullable: true })
-  lastLogin: Date; // 最后一次登录的时间
+  lastLogin: Date; // 最后登录时间
 
   @Column('simple-array', { nullable: true })
-  devices: string[]; // 登录设备，最多为3个
+  devices: string[]; // 登录设备
 
   @ManyToMany(() => User)
   @JoinTable()
@@ -85,15 +84,11 @@ export class User {
   })
   level: UserLevel; // 用户等级
 
-  @Column({
-    type: 'timestamp',
-  })
-  createdAt: Date;
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date; // 创建时间
 
-  @Column({
-    type: 'timestamp',
-  })
-  updatedAt: Date;
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  updatedAt: Date; // 更新时间
 
   @DeleteDateColumn({ type: 'timestamp', nullable: true })
   deletedAt: Date; // 软删除时间
@@ -107,7 +102,10 @@ export class User {
   @OneToMany(() => Video, (video) => video.author)
   videos: Video[];
 
+  @OneToMany(() => Comment, (comment) => comment.author)
+  comments: Comment[]; // 用户的评论
+
   constructor() {
-    this.uid = uuidv4(); // 在构造函数中生成 UID
+    this.uid = uuidv4(); // 生成 UID
   }
 }

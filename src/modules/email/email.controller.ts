@@ -9,7 +9,9 @@ import {
 } from '@nestjs/common';
 import { EmailService } from './email.service';
 import { UserService } from '../user/user.service';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('邮件') // 用于分组 API
 @Controller('email')
 export class EmailController {
   constructor(

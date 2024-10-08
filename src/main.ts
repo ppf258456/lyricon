@@ -5,16 +5,36 @@ declare const module: any;
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
+import { setupSwagger } from './swagger'; // 引入 Swagger 配置
 import { ValidationPipe, Logger, BadRequestException } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express'; // 导入 NestExpressApplication
 import redisConfig from './config/redis.config';
 import { Redis } from 'ioredis';
-import { ConfigService } from '@nestjs/config';
-import { JwtMiddleware } from './middleware/jwt.middleware';
-import { JwtService } from '@nestjs/jwt';
+import { join } from 'path';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+  // 获取 ConfigService 实例
+  const configService = new ConfigService();
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create<NestExpressApplication>(AppModule);
+    // // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // const path = require('path');
+    // console.log(path.join(__dirname, '../public'));
+
+    // bootstrap 函数中设置静态资源路径
+    // console.log(join(__dirname, '../public')); // 应该输出 public 目录的绝对路径
+    app.useStaticAssets(join(__dirname, '..', 'public'));
+
+    // 启用 CORS
+    app.enableCors({
+      origin: 'http://localhost:3000', // 允许的域名
+      methods: ['GET', 'POST', 'PUT', 'DELETE'], // 允许的 HTTP 方法
+      credentials: true, // 允许发送 cookies
+    });
+    // 设置 Swagger
+    setupSwagger(app, configService); // 将 configService 传递给 Swagger 配置
     // 使用全局 ValidationPipe
     app.useGlobalPipes(
       new ValidationPipe({
@@ -30,13 +50,8 @@ async function bootstrap() {
         },
       }),
     );
-    const logger = new Logger('Bootstrap');
-    const jwtService = app.get(JwtService); // 获取 JwtService 实例
-    app.use((req, res, next) =>
-      new JwtMiddleware(jwtService).use(req, res, next),
-    ); // 作为中间件使用
 
-    const port = process.env.PORT || 3000;
+    const port = configService.get('PORT'); // 从 configService 获取端口
     await app.listen(port);
     logger.log(`Application is running on: http://localhost:${port}`);
 
@@ -47,7 +62,7 @@ async function bootstrap() {
   } catch (error) {
     Logger.error(error);
   }
-  const configService = new ConfigService(); // 需要初始化 ConfigService
+
   const redisClient: Redis = redisConfig(configService);
 
   // 处理关闭事件

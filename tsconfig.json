@@ -18,7 +18,10 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "moduleResolution": "node",
-    "typeRoots": ["node_modules/@types", "src/@types"]
+    "types": ["node", "express"], 
+    "typeRoots": ["node_modules/@types", "src/@types"],
+    "lib": ["es6", "dom"], // 确保包含 'dom'
+    
   },
  
 }

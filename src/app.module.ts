@@ -2,15 +2,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import typeormConfig from './config/typeorm.config';
-import redisConfig from './config/redis.config';
 import { JwtModule } from '@nestjs/jwt';
-import { jwtConfig } from './config/jwt.config'; // 导入 jwtConfig
+import { jwtConfig } from './config/jwt.config';
 
 import { UserModule } from './modules/user/user.module';
 import { EmailModule } from './modules/email/email.module';
 import { LoginModule } from './modules/login/login.module';
-import { Redis } from 'ioredis';
-
+import { RedisModule } from './modules/redis/redis.module'; // 确保路径正确
+import { CategoryModule } from './modules/category/category.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -31,17 +30,10 @@ import { Redis } from 'ioredis';
     UserModule,
     EmailModule,
     LoginModule,
+    RedisModule, // 只在这里导入 RedisModule
+    CategoryModule,
   ],
   controllers: [],
-  providers: [
-    {
-      provide: 'REDIS_CLIENT',
-      useFactory: (configService: ConfigService): Redis => {
-        const client = redisConfig(configService);
-        return client;
-      },
-      inject: [ConfigService],
-    },
-  ],
+  providers: [],
 })
 export class AppModule {}
