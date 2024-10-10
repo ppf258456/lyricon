@@ -11,16 +11,15 @@ import {
   Delete,
   HttpException,
   HttpStatus,
-  Query,
 } from '@nestjs/common';
 import { AdminGuard } from 'src/auth/AdminGuard';
 import { BaseGuard } from 'src/auth/base.guard';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { PaginationDto } from './dto/pagination.dto';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Category } from './entities/category.entity';
 
 @ApiTags('分类') // 用于分组 API
 @Controller('category')
@@ -28,7 +27,7 @@ export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   // 创建分类
-  @UseGuards(BaseGuard, AdminGuard) // 根据需要使用守卫
+  @UseGuards(BaseGuard, AdminGuard)
   @Post()
   async create(@Body() createCategoryDto: CreateCategoryDto) {
     try {
@@ -46,20 +45,26 @@ export class CategoryController {
       );
     }
   }
-
-  // 获取所有分类（包含分页）
-
+  // 获取所有一级分类
   @Get()
-  async findAll(@Query() paginationDto: PaginationDto) {
-    return await this.categoryService.findAll(paginationDto);
+  async findAll(): Promise<Category[]> {
+    try {
+      return await this.categoryService.findAll();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      throw new HttpException(
+        '内部服务器错误',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
-  // 获取单个分类
-
+  // 根据1级ID获取2级分类列表
+  // 这个ID值为parentCategoryId
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  async findSubcategories(@Param('id') id: string): Promise<Category[]> {
     try {
-      return await this.categoryService.findOne(+id);
+      return await this.categoryService.findSubcategories(+id);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw new HttpException(error.message, HttpStatus.NOT_FOUND);
@@ -72,7 +77,7 @@ export class CategoryController {
   }
 
   // 更新分类
-  @UseGuards(BaseGuard, AdminGuard) // 根据需要使用守卫
+  @UseGuards(BaseGuard, AdminGuard)
   @Patch(':id')
   async update(
     @Param('id') id: string,
@@ -95,7 +100,7 @@ export class CategoryController {
   }
 
   // 删除分类
-  @UseGuards(BaseGuard, AdminGuard) // 根据需要使用守卫
+  @UseGuards(BaseGuard, AdminGuard)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     try {

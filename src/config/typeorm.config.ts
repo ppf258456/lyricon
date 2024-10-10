@@ -1,5 +1,4 @@
 // src/config/typeorm.config.ts
-// src/config/typeorm.config.ts
 
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';

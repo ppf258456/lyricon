@@ -76,7 +76,7 @@ export class UserController {
     return userData; // 查询指定用户
   }
 
-  @Patch('update/:id')
+  @Patch(':id')
   @UseGuards(BaseGuard)
   async updateUser(
     @Param('id') userId: number,
